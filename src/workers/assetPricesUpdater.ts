@@ -1,5 +1,6 @@
 import PythHermes from '../utils/pythHermesUtils';
 import Fmp from '../utils/fmpUtils';
+import Alpaca from '../utils/alpacaUtils';
 import { parentPort } from 'worker_threads';
 import { WorkerMessage } from '../types/worker';
 import { loadAssetsFromFile, getAssetPriceFeeds } from '../services/assetsService';
@@ -8,14 +9,17 @@ import { updateAssetPrices, getAssetPrices } from '../services/assetPriceService
 let priceFeeds: string[] | null = null
 let timeouts: NodeJS.Timeout[] = [];
 
-async function fetchData(type: string) {
+async function fetchData(provider: string, type: string) {
     try {
         let data = null;
-        if (type == "crypto" && priceFeeds) {
+        if (provider == "pyth" && type == "crypto" && priceFeeds) {
             data = await PythHermes.getLatestPrices("crypto", priceFeeds);
         }
-        else if (type == "stock.nasdaq" || type == "forex") {
+        else if (provider == "fmp" && (type == "stock.nasdaq" || type == "forex")) {
             data = await Fmp.getLatestPrices(type);
+        }
+        else if (provider == "alpaca" && type == "stock.nasdaq") {
+            data = await Alpaca.getLatestPrices(type);
         }
         if (data) {
             updateAssetPrices(data);
@@ -28,13 +32,16 @@ async function fetchData(type: string) {
 parentPort?.on('message', (message: WorkerMessage) => {
     if (message.type === 'start') {
         timeouts.push(setInterval(() => {
-            fetchData("crypto");
+            fetchData("pyth", "crypto");
         }, message.payload.interval));
         timeouts.push(setInterval(() => {
-            fetchData("stock.nasdaq");
+            fetchData("fmp", "stock.nasdaq");
         }, message.payload.interval));
         timeouts.push(setInterval(() => {
-            fetchData("forex");
+            fetchData("fmp", "forex");
+        }, message.payload.interval));
+        timeouts.push(setInterval(() => {
+            fetchData("alpaca", "stock.nasdaq");
         }, message.payload.interval));
     }
     else if (message.type === 'stop') {

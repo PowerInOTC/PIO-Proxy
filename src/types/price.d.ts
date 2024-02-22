@@ -31,7 +31,7 @@ export type PreparedPrice = {
     symbol: string;
     type: string;
     price: string;
-    confidence: string;
+    confidence: number;
     timestamp: number
 }
 

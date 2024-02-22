@@ -1,6 +1,5 @@
 import { Price, PriceResponse, Prices, RetrievedPrices } from '../types/price'
 import Logger from '../utils/logger';
-import priceEventEmitter from '../events/priceEvent';
 import { priceToPreparedPrice } from '../utils/priceUtils';
 
 const assetPrices: Prices = {};
@@ -11,11 +10,14 @@ function updateAssetPrices(newPrices: RetrievedPrices): void {
             Logger.warn('app', `[updateAssetPrices] | Unable to update asset ${assetName} - Old publishTime: ${assetPrices[assetName].providerPrices[priceInfo.provider].timestamp} New publishTime ${priceInfo.timestamp}`);
         }
         else {
-            const newPrice: Price = {
-                symbol: assetName, type: priceInfo.type, providerPrices: { [priceInfo.provider]: { bidPrice: priceInfo.bidPrice, askPrice: priceInfo.askPrice, timestamp: priceInfo.timestamp } }
+            if (!assetPrices[assetName]) {
+                assetPrices[assetName] = {
+                    symbol: assetName, type: priceInfo.type, providerPrices: { [priceInfo.provider]: { bidPrice: priceInfo.bidPrice, askPrice: priceInfo.askPrice, timestamp: priceInfo.timestamp } }
+                };
             }
-            assetPrices[assetName] = newPrice;
-            priceEventEmitter.emit('pricesUpdated', newPrice);
+            else {
+                assetPrices[assetName].providerPrices[priceInfo.provider] = { bidPrice: priceInfo.bidPrice, askPrice: priceInfo.askPrice, timestamp: priceInfo.timestamp };
+            }
         }
     }
 }
@@ -24,13 +26,19 @@ function getAssetPrices(ids: string[] | null): PriceResponse {
     let selectedPrices: PriceResponse = {};
     if (ids == null) {
         for (const [assetName, priceInfo] of Object.entries(assetPrices)) {
-            selectedPrices[assetName] = priceToPreparedPrice(priceInfo);
+            const preparedPrice = priceToPreparedPrice(priceInfo);
+            if (preparedPrice && preparedPrice.price) {
+                selectedPrices[assetName] = preparedPrice
+            }
         }
     }
     else {
         ids.forEach((symbol: string) => {
             if (assetPrices[symbol]) {
-                selectedPrices[symbol] = priceToPreparedPrice(assetPrices[symbol]);
+                const preparedPrice = priceToPreparedPrice(assetPrices[symbol]);
+                if (preparedPrice && preparedPrice.price) {
+                    selectedPrices[symbol] = preparedPrice;
+                }
             }
         })
     }
