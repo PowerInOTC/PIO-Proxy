@@ -1,0 +1,52 @@
+# Node.js
+node_modules/
+
+# TypeScript
+*.tsbuildinfo
+
+# Visual Studio Code
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# JetBrains
+.idea/
+
+# npm
+*.log
+npm-debug.log*
+
+# Yarn
+yarn-error.log
+
+# Dependency directories
+/jspm_packages/
+/bower_components/
+
+# TypeScript output directory
+/dist/
+
+# Editor-specific files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build files
+/build/
+
+# Temporary files
+*.bak
+*.tmp
+
+# Log files
+*.log
+
+# Env files
+.env
