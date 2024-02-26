@@ -1,50 +1,98 @@
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import { handleRouteError, handleFunctionError } from '../utils/sharedUtils';
-import { getAssetPrices } from '../services/assetPriceService';
-import Fmp from '../utils/fmpUtils';
 import WorkerController from '../utils/worker';
+import { formatTicker } from '../utils/priceUtils';
 
 export const priceController = {
-    getPrices: async (req: Request, res: Response): Promise<void> => {
-        const { ids } = req.query as { ids?: string[] };
+    getPairPrice: async (req: Request, res: Response): Promise<void> => {
+        let a = req.query.a;
+        let b = req.query.b;
+        let abPrecision = req.query.abprecision;
+        let confPrecision = req.query.confprecision;
 
-        if (ids !== undefined) {
-            if (ids.length > 100) {
-                handleRouteError(res, 400, 'access', 'get_prices', 'The ids[] parameter is too large');
+        if (!a || !b) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'You need to provide a & b parameters');
+            return;
+        }
+
+        if (typeof a !== 'string' || typeof b !== 'string') {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'a & b parameters need to be strings');
+            return;
+        }
+
+        if (a.length > 100 || b.length > 100) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'a & b parameters need to be < 100 characters');
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9\.]+$/.test(a) || !/^[a-zA-Z0-9\.]+$/.test(b)) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'a & b parameters should only contain letters & numbers + dot symbol');
+            return;
+        }
+
+        let abPrecisionNum: number | null = null;
+        let confPrecisionNum: number | null = null;
+
+        if (abPrecision) {
+            if (typeof abPrecision !== 'string') {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'abPrecision parameter needs to be a string');
                 return;
             }
 
-            // Regular expression to match hex characters + 'x'
-            const hexRegex = /^[0-9a-zA-Zx.]+$/;
+            if (!/^[\d]+$/.test(abPrecision)) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'abPrecision parameter should only contain numbers');
+                return;
+            }
 
-            for (const id of ids) {
-                if (id.length > 20 || !hexRegex.test(id)) {
-                    handleRouteError(res, 400, 'access', 'get_prices', 'Some elements of the ids parameter are incorrect');
-                    return;
-                }
+            abPrecisionNum = parseInt(abPrecision);
+
+            if (abPrecisionNum < 0 || abPrecisionNum > 20) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'abPrecision parameter should be between 0 and 20');
+                return;
+            }
+        }
+
+        if (confPrecision) {
+            if (typeof confPrecision !== 'string') {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'confPrecision parameter needs to be a string');
+                return;
+            }
+
+            if (!/^[\d]+$/.test(confPrecision)) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'confPrecision parameter should only contain numbers');
+                return;
+            }
+
+            confPrecisionNum = parseInt(confPrecision);
+
+            if (confPrecisionNum < 0 || confPrecisionNum > 20) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'confPrecision parameter should be between 0 and 20');
+                return;
             }
         }
 
         try {
-            const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
-            const data = await workerController.sendMessageToWorker({ type: 'getprices', payload: { ids: ids } });
+            a = formatTicker(a);
+            b = formatTicker(b);
 
-            if (data) {
+            const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
+            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum } });
+
+            if (data && data.payload) {
                 res.json(data.payload);
                 return;
             }
             else {
-                handleRouteError(res, 404, 'access', 'get_prices', `Data not found for the given price feed ID: ${ids}`);
+                handleRouteError(res, 404, 'access', 'getPairPrice', 'Data not found for the given tickers');
                 return;
             }
         }
         catch (error) {
             if (error instanceof Error) {
-                handleFunctionError('app', 'get_prices', `Caught an error: ${error.message}`);
+                handleFunctionError('app', 'getPairPrice', `Caught an error: ${error.message}`);
             }
 
-            handleRouteError(res, 500, 'access', 'get_prices', 'Internal Server Error');
+            handleRouteError(res, 500, 'access', 'getPairPrice', 'Internal Server Error');
             return;
         }
     }

@@ -1,6 +1,5 @@
-import { Price, PriceResponse, Prices, RetrievedPrices } from '../types/price'
+import { Prices, RetrievedPrices, PairPrice, Price } from '../types/price'
 import Logger from '../utils/logger';
-import { priceToPreparedPrice } from '../utils/priceUtils';
 
 const assetPrices: Prices = {};
 
@@ -22,27 +21,26 @@ function updateAssetPrices(newPrices: RetrievedPrices): void {
     }
 }
 
-function getAssetPrices(ids: string[] | null): PriceResponse {
-    let selectedPrices: PriceResponse = {};
-    if (ids == null) {
-        for (const [assetName, priceInfo] of Object.entries(assetPrices)) {
-            const preparedPrice = priceToPreparedPrice(priceInfo);
-            if (preparedPrice && preparedPrice.price) {
-                selectedPrices[assetName] = preparedPrice
-            }
-        }
+function getAssetPrice(id: string): Price | null {
+    if (assetPrices[id]) {
+        return assetPrices[id];
     }
-    else {
-        ids.forEach((symbol: string) => {
-            if (assetPrices[symbol]) {
-                const preparedPrice = priceToPreparedPrice(assetPrices[symbol]);
-                if (preparedPrice && preparedPrice.price) {
-                    selectedPrices[symbol] = preparedPrice;
-                }
-            }
-        })
-    }
-    return selectedPrices;
+    return null;
 }
 
-export { assetPrices, updateAssetPrices, getAssetPrices };
+function getAssetPrices(ids?: string[] | null): Prices {
+    if (!ids) {
+        return assetPrices;
+    }
+    else {
+        let selectedPrices: Prices = {};
+        ids.forEach((symbol: string) => {
+            if (assetPrices[symbol]) {
+                selectedPrices[symbol] = assetPrices[symbol];
+            }
+        })
+        return selectedPrices;
+    }
+}
+
+export { assetPrices, updateAssetPrices, getAssetPrices, getAssetPrice };

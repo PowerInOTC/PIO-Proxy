@@ -11,14 +11,14 @@ export type RetrievedPrices = {
     [assetName: string]: RetrievedPrice;
 }
 
+export type Prices = {
+    [assetName: string]: Price;
+}
+
 export type Price = {
     symbol: string;
     type: string;
     providerPrices: { [provider: string]: ProviderPrices };
-}
-
-export type Prices = {
-    [assetName: string]: Price;
 }
 
 export type ProviderPrices = {
@@ -27,14 +27,11 @@ export type ProviderPrices = {
     timestamp: number;
 }
 
-export type PreparedPrice = {
-    symbol: string;
-    type: string;
-    price: string;
-    confidence: number;
-    timestamp: number
-}
-
-export type PriceResponse = {
-    [assetName: string]: PreparedPrice;
+export type PairPrice = {
+    assetA: string;
+    assetB: string;
+    pairBid: string;
+    pairAsk: string;
+    confidence: string;
+    timestamp: number;
 }

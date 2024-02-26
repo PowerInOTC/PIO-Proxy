@@ -1,39 +1,44 @@
-import axios, { AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 import { handleFunctionError } from './sharedUtils';
 import { config } from '../config';
 import { RetrievedPrices } from '../types/price';
 import { AlpacaPrice, AlpacaResponse } from '../types/alpaca';
-import { getSymbols } from '../services/assetsService';
+import { splitSymbols } from './priceUtils';
 
 class Alpaca {
-    public static async getLatestPrices(type: string): Promise<RetrievedPrices | null> {
+    public static async getLatestPrices(type: string, symbols: string[]): Promise<RetrievedPrices | null> {
         try {
-            const symbols = getSymbols(type);
+            const baseUrl = 'https://data.alpaca.markets/v2/stocks/quotes/latest';
+            //No limits of symbols for Alpaca
+            const symbolsChunks = splitSymbols(symbols, 10000);
+            const urls = symbolsChunks.map(chunk => `${baseUrl}?symbols=${chunk}`);
 
-            if (!symbols) {
-                return null;
-            }
+            const requestsConfig: AxiosRequestConfig[] = urls.map(url => ({
+                method: 'GET',
+                url: url,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'APCA-API-KEY-ID': config.alpacaKey,
+                    'APCA-API-SECRET-KEY': config.alpacaSecret,
+                },
+                timeout: 2000
+            }));
 
-            const headers = {
-                'Content-Type': 'application/json',
-                'APCA-API-KEY-ID': config.alpacaKey,
-                'APCA-API-SECRET-KEY': config.alpacaSecret,
-            };
-
-            let apiUrl = 'https://data.alpaca.markets';
-            apiUrl += '/v2/stocks/quotes/latest';
-            apiUrl += '?symbols=';
-            apiUrl += symbols.join(',');
-
-            const response: AxiosResponse<AlpacaResponse> = await axios.get(apiUrl, { headers: headers, timeout: 5000 });
+            const responses = await axios.all(requestsConfig.map(config => axios(config)));
 
             const prices: RetrievedPrices = {};
+            responses.forEach((response) => {
+                const data: AlpacaResponse = response.data;
 
-            Object.entries(response.data.quotes).forEach(([symbol, stock]: [string, AlpacaPrice]) => {
-                if (stock.bp && stock.ap) {
-                    const timestamp = Math.floor(new Date(stock.t).getTime() / 1000);
-                    prices[type + "." + symbol.toUpperCase()] = { symbol: symbol.toUpperCase(), type: type, bidPrice: stock.bp.toString(), askPrice: stock.ap.toString(), provider: "alpaca", timestamp: timestamp };
-                }
+                Object.entries(data.quotes).forEach(([symbol, stock]: [string, AlpacaPrice]) => {
+                    if (stock.bp && stock.ap) {
+                        let timestamp = new Date(stock.t).getTime();
+                        if (timestamp < 1000000000000) {
+                            timestamp = timestamp * 1000;
+                        }
+                        prices[type + "." + symbol.toUpperCase()] = { symbol: symbol.toUpperCase(), type: type, bidPrice: stock.bp.toString(), askPrice: stock.ap.toString(), provider: "alpaca", timestamp: timestamp };
+                    }
+                });
             });
 
             return prices;

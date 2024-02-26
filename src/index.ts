@@ -61,9 +61,13 @@ async function init(): Promise<void> {
 
         // Start the pricesUpdater worker
         const assetPricesUpdater = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
-        assetPricesUpdater.sendMessageToWorker({ type: 'setassets' });
-        assetPricesUpdater.sendMessageToWorker({ type: 'setpricefeeds' });
-        assetPricesUpdater.sendMessageToWorker({ type: 'start', payload: { interval: 1000 } });
+        if (!(await assetPricesUpdater.sendMessageToWorker({ type: 'setassets' })).payload) {
+            handleFunctionError('app', 'init', `Can't set assets`);
+            await shutdown();
+            return;
+        }
+
+        assetPricesUpdater.sendMessageToWorker({ type: 'start', payload: { interval: config.priceFetchInterval } });
 
         // Middleware
         app.use(express.json());
@@ -73,7 +77,7 @@ async function init(): Promise<void> {
         app.get('/api/v1/get_prices', checkAuthorization);
 
         // Routes
-        app.get('/api/v1/get_prices', priceController.getPrices);
+        app.get('/api/v1/get_pair_price', priceController.getPairPrice);
 
         server.listen(config.serverPort, () => {
             const protocol: string = config.https ? 'https' : 'http';

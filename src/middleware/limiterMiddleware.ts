@@ -1,7 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 
-// Define a middleware function to limit requests based on API key
 export function limiter(windowMs: number, maxRequests: number): express.RequestHandler {
   return rateLimit({
     windowMs: windowMs,

@@ -1,6 +1,17 @@
 import BigNumber from "bignumber.js";
-import { PreparedPrice, Price } from "../types/price";
+import { config } from '../config';
+import { PairPrice, Price } from "../types/price";
 import { handleFunctionError } from "./sharedUtils";
+
+export function splitSymbols(symbols: string[], chunkSize: number): string[] {
+    const result: string[] = [];
+
+    for (let i = 0; i < symbols.length; i += chunkSize) {
+        result.push(symbols.slice(i, i + chunkSize).join(','));
+    }
+
+    return result;
+}
 
 export function formatNumberWithDecimals(inputNumber: string, decimalAmount: number): string {
     if (decimalAmount === 0) {
@@ -17,6 +28,19 @@ export function formatNumberWithDecimals(inputNumber: string, decimalAmount: num
     return formattedNumber;
 }
 
+export function formatTicker(input: string): string {
+    const parts = input.split('.');
+    const lastPartIndex = parts.length - 1;
+
+    parts[lastPartIndex] = parts[lastPartIndex].toUpperCase();
+
+    for (let i = 0; i < lastPartIndex; i++) {
+        parts[i] = parts[i].toLowerCase();
+    }
+
+    return parts.join('.');
+}
+
 export function removePercentage(num: BigNumber, percentage: number): BigNumber {
     if (percentage < 0 || percentage > 100) {
         throw new Error('Percentage must be between 0 and 100');
@@ -29,48 +53,140 @@ export function removePercentage(num: BigNumber, percentage: number): BigNumber 
     return result;
 }
 
-export function priceToPreparedPrice(price: Price): PreparedPrice | null {
-    try {
-        let totalRealPrice = new BigNumber(0);
-        let numberOfProviders = 0;
-        let minRealPrice = new BigNumber(Infinity);
-        let maxRealPrice = new BigNumber(-Infinity);
-        let oldestTimestamp = 0
+export function checkPriceValue(price: string): boolean {
+    if (price && price != "0" && /^[\d\.]+$/.test(price)) {
+        return true;
+    }
+    return false;
+}
 
+export function getLatestTimestampFromPrices(prices: Price[]): number | null {
+    let maxTimestamp = -Infinity;
+    for (const price of prices) {
         for (const provider in price.providerPrices) {
             if (price.providerPrices.hasOwnProperty(provider)) {
                 const providerPrice = price.providerPrices[provider];
-
-                const bid = new BigNumber(providerPrice.bidPrice);
-                const ask = new BigNumber(providerPrice.askPrice);
-
-                const realPrice = bid.plus(ask).dividedBy(2);
-
-                minRealPrice = BigNumber.min(minRealPrice, realPrice);
-                maxRealPrice = BigNumber.max(maxRealPrice, realPrice);
-
-                totalRealPrice = totalRealPrice.plus(realPrice);
-                numberOfProviders++;
-
-                if (oldestTimestamp == 0 || oldestTimestamp > providerPrice.timestamp) {
-                    oldestTimestamp = providerPrice.timestamp;
+                if (checkPriceValue(providerPrice.bidPrice) && checkPriceValue(providerPrice.askPrice)) {
+                    if (maxTimestamp < providerPrice.timestamp) {
+                        maxTimestamp = providerPrice.timestamp;
+                    }
                 }
             }
         }
+    }
+    if (maxTimestamp == -Infinity) {
+        return null;
+    }
 
-        if (!numberOfProviders || totalRealPrice == new BigNumber(0) || !oldestTimestamp) {
+    return maxTimestamp;
+}
+
+export function coefficientOfVariation(prices: BigNumber[]): BigNumber {
+    const sumPrice = prices.reduce((total, price) => total.plus(price), new BigNumber(0));
+    const priceMean = sumPrice.dividedBy(prices.length);
+    const squaredDifferences = prices.map(price => price.minus(priceMean).pow(2));
+    const sumSquaredDifferences = squaredDifferences.reduce((total, diff) => total.plus(diff), new BigNumber(0));
+    const averageSquaredDifference = sumSquaredDifferences.dividedBy(prices.length);
+    const standardDeviation = averageSquaredDifference.squareRoot();
+    const coefficientOfVariation = standardDeviation.dividedBy(priceMean);
+
+    return coefficientOfVariation;
+}
+
+export function getPriceEstimate(price: Price, allowedTimestamp: number): {
+    bidPriceEstimate: BigNumber,
+    askPriceEstimate: BigNumber,
+    bidConfidence: BigNumber,
+    askConfidence: BigNumber,
+    timestamp: number
+} | null {
+    let bidPrices: BigNumber[] = [];
+    let askPrices: BigNumber[] = [];
+    let minTimestamp = Infinity;
+    let numberOfProviders = 0;
+
+    for (const provider in price.providerPrices) {
+        if (price.providerPrices.hasOwnProperty(provider) && price.providerPrices[provider].timestamp >= allowedTimestamp) {
+            const providerPrice = price.providerPrices[provider];
+            if (checkPriceValue(providerPrice.bidPrice) && checkPriceValue(providerPrice.askPrice)) {
+                if (minTimestamp > providerPrice.timestamp) {
+                    minTimestamp = providerPrice.timestamp;
+                }
+                bidPrices.push(new BigNumber(providerPrice.bidPrice));
+                askPrices.push(new BigNumber(providerPrice.askPrice));
+                numberOfProviders += 1;
+            }
+        }
+    }
+
+    if (numberOfProviders == 0) {
+        return null;
+    }
+
+    const bidCoefficientOfVariation = coefficientOfVariation(bidPrices);
+    const askCoefficientOfVariation = coefficientOfVariation(askPrices);
+    const bidSumPrice = bidPrices.reduce((total, price) => total.plus(price), new BigNumber(0));
+    const askSumPrice = askPrices.reduce((total, price) => total.plus(price), new BigNumber(0));
+    const bidPriceEstimate = bidSumPrice.dividedBy(bidPrices.length);
+    const askPriceEstimate = askSumPrice.dividedBy(bidPrices.length);
+
+    return {
+        bidPriceEstimate: bidPriceEstimate,
+        askPriceEstimate: askPriceEstimate,
+        bidConfidence: bidCoefficientOfVariation,
+        askConfidence: askCoefficientOfVariation,
+        timestamp: minTimestamp
+    };
+}
+
+export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecision: number): PairPrice | null {
+    try {
+        const lastTimestamp = getLatestTimestampFromPrices([a, b]);
+
+        if (!lastTimestamp) {
             return null;
         }
-        const lastPrice = totalRealPrice.dividedBy(numberOfProviders);
 
-        const percentageDifference = maxRealPrice.minus(minRealPrice).div(minRealPrice);
-        const confidence = BigNumber(1).minus(percentageDifference);
-        const roundedConfidence = confidence.decimalPlaces(4, BigNumber.ROUND_DOWN);
+        const allowedTimestamp = lastTimestamp - config.maxTimestampDiff;
 
-        return { symbol: price.symbol, type: price.type, price: lastPrice.toString(), confidence: roundedConfidence.toNumber(), timestamp: oldestTimestamp };
+        const aEstimate = getPriceEstimate(a, allowedTimestamp);
+        if (!aEstimate) {
+            return null;
+        }
+
+        const bEstimate = getPriceEstimate(b, allowedTimestamp);
+        if (!bEstimate) {
+            return null;
+        }
+
+        let pairBid: string | null = null;
+        let pairAsk: string | null = null;
+        if (abPrecision) {
+            pairBid = aEstimate.bidPriceEstimate.dividedBy(bEstimate.bidPriceEstimate).decimalPlaces(abPrecision, BigNumber.ROUND_HALF_UP).toString();
+            pairAsk = aEstimate.askPriceEstimate.dividedBy(bEstimate.askPriceEstimate).decimalPlaces(abPrecision, BigNumber.ROUND_HALF_UP).toString();
+        }
+        else {
+            pairBid = aEstimate.bidPriceEstimate.dividedBy(bEstimate.bidPriceEstimate).toString();
+            pairAsk = aEstimate.askPriceEstimate.dividedBy(bEstimate.askPriceEstimate).toString();
+        }
+
+        const oldestTimestamp = Math.min(aEstimate.timestamp, bEstimate.timestamp);
+
+        const confidence = new BigNumber(1).minus(BigNumber.max(aEstimate.bidConfidence, aEstimate.askConfidence, bEstimate.bidConfidence, bEstimate.askConfidence));
+
+        let roundedConfidence: number | null = null;
+
+        if (confPrecision) {
+            roundedConfidence = confidence.decimalPlaces(confPrecision, BigNumber.ROUND_DOWN).toNumber();
+        }
+        else {
+            roundedConfidence = confidence.toNumber();
+        }
+
+        return { assetA: a.symbol, assetB: b.symbol, pairBid: pairBid, pairAsk: pairAsk, confidence: roundedConfidence.toString(), timestamp: oldestTimestamp };
     } catch (error) {
         if (error instanceof Error) {
-            handleFunctionError('app', 'priceToPreparedPrice', `Caught an error: ${error.message}`);
+            handleFunctionError('app', 'getPairPrice', `Caught an error: ${error.message}`);
         }
 
         return null;

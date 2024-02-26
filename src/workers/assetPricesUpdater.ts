@@ -1,25 +1,23 @@
-import PythHermes from '../utils/pythHermesUtils';
 import Fmp from '../utils/fmpUtils';
 import Alpaca from '../utils/alpacaUtils';
 import { parentPort } from 'worker_threads';
 import { WorkerMessage } from '../types/worker';
-import { loadAssetsFromFile, getAssetPriceFeeds } from '../services/assetsService';
-import { updateAssetPrices, getAssetPrices } from '../services/assetPriceService';
+import { updateAssetPrices, getAssetPrice } from '../services/assetPriceService';
+import { getPairPrice } from '../utils/priceUtils';
+import { getSymbols, updateAssets } from '../services/assetsService';
+import { Assets } from '../types/assets';
 
-let priceFeeds: string[] | null = null
+let symbols: { [key: string]: string[] } = {};
 let timeouts: NodeJS.Timeout[] = [];
 
 async function fetchData(provider: string, type: string) {
     try {
         let data = null;
-        if (provider == "pyth" && type == "crypto" && priceFeeds) {
-            data = await PythHermes.getLatestPrices("crypto", priceFeeds);
-        }
-        else if (provider == "fmp" && (type == "stock.nasdaq" || type == "forex")) {
-            data = await Fmp.getLatestPrices(type);
+        if (provider == "fmp" && (type == "stock.nasdaq" || type == "forex")) {
+            data = await Fmp.getLatestPrices(type, symbols[type]);
         }
         else if (provider == "alpaca" && type == "stock.nasdaq") {
-            data = await Alpaca.getLatestPrices(type);
+            data = await Alpaca.getLatestPrices(type, symbols[type]);
         }
         if (data) {
             updateAssetPrices(data);
@@ -29,11 +27,12 @@ async function fetchData(provider: string, type: string) {
     }
 }
 
-parentPort?.on('message', (message: WorkerMessage) => {
+parentPort?.on('message', async (message: WorkerMessage) => {
     if (message.type === 'start') {
-        timeouts.push(setInterval(() => {
-            fetchData("pyth", "crypto");
-        }, message.payload.interval));
+        fetchData("fmp", "stock.nasdaq");
+        fetchData("fmp", "forex");
+        fetchData("alpaca", "stock.nasdaq");
+
         timeouts.push(setInterval(() => {
             fetchData("fmp", "stock.nasdaq");
         }, message.payload.interval));
@@ -52,19 +51,38 @@ parentPort?.on('message', (message: WorkerMessage) => {
         }
     }
     else if (message.type === 'setassets') {
-        loadAssetsFromFile('./config/assets.json');
-    }
-    else if (message.type === 'setpricefeeds') {
-        priceFeeds = getAssetPriceFeeds();
-    }
-    else if (message.type === 'getprices') {
-        if (message.payload.ids && message.payload.ids.length > 0) {
-            const prices = getAssetPrices(message.payload.ids)
-            parentPort?.postMessage({ uuid: message.uuid, type: 'getpricesresult', payload: prices });
+        const stockSymbols = await Fmp.getStockSymbols();
+        const forexSymbols = await Fmp.getForexSymbols();
+
+        if (stockSymbols && forexSymbols) {
+            const mergedSymbols: Assets = { ...stockSymbols, ...forexSymbols };
+            updateAssets(mergedSymbols);
+            symbols = getSymbols();
+
+            parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: true });
         }
         else {
-            const prices = getAssetPrices(null);
-            parentPort?.postMessage({ uuid: message.uuid, type: 'getpricesresult', payload: prices });
+            parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: false });
+        }
+    }
+    else if (message.type === 'getpairprice') {
+        if (message.payload.a && message.payload.b) {
+            const a = getAssetPrice(message.payload.a);
+            if (!a) {
+                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
+                return;
+            }
+            const b = getAssetPrice(message.payload.b);
+            if (!b) {
+                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
+                return;
+            }
+            const pairPrice = getPairPrice(a, b, message.payload.abPrecision, message.payload.confPrecision);
+            if (!pairPrice) {
+                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
+                return;
+            }
+            parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: pairPrice });
         }
     }
 });
