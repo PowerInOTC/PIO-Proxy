@@ -67,8 +67,6 @@ async function init(): Promise<void> {
             return;
         }
 
-        assetPricesUpdater.sendMessageToWorker({ type: 'start', payload: { interval: config.priceFetchInterval } });
-
         // Middleware
         app.use(express.json());
 

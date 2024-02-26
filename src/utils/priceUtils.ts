@@ -1,16 +1,27 @@
 import BigNumber from "bignumber.js";
 import { config } from '../config';
-import { PairPrice, Price } from "../types/price";
+import { PairPrice, Price, Prices, RetrievedPrices } from "../types/price";
 import { handleFunctionError } from "./sharedUtils";
+import Logger from '../utils/logger';
 
-export function splitSymbols(symbols: string[], chunkSize: number): string[] {
-    const result: string[] = [];
-
-    for (let i = 0; i < symbols.length; i += chunkSize) {
-        result.push(symbols.slice(i, i + chunkSize).join(','));
+export function updateAssetPrices(assetPrices: Prices, newPrices: RetrievedPrices): Prices {
+    for (const [assetName, priceInfo] of Object.entries(newPrices)) {
+        if (assetPrices[assetName] && assetPrices[assetName].providerPrices[priceInfo.provider] && assetPrices[assetName].providerPrices[priceInfo.provider].timestamp && assetPrices[assetName].providerPrices[priceInfo.provider].timestamp > priceInfo.timestamp) {
+            Logger.warn('app', `[updateAssetPrices] | Unable to update asset ${assetName} - Old publishTime: ${assetPrices[assetName].providerPrices[priceInfo.provider].timestamp} New publishTime ${priceInfo.timestamp}`);
+        }
+        else {
+            if (!assetPrices[assetName]) {
+                assetPrices[assetName] = {
+                    symbol: assetName, type: priceInfo.type, providerPrices: { [priceInfo.provider]: { bidPrice: priceInfo.bidPrice, askPrice: priceInfo.askPrice, timestamp: priceInfo.timestamp } }
+                };
+            }
+            else {
+                assetPrices[assetName].providerPrices[priceInfo.provider] = { bidPrice: priceInfo.bidPrice, askPrice: priceInfo.askPrice, timestamp: priceInfo.timestamp };
+            }
+        }
     }
 
-    return result;
+    return assetPrices;
 }
 
 export function formatNumberWithDecimals(inputNumber: string, decimalAmount: number): string {
@@ -172,7 +183,7 @@ export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecis
 
         const oldestTimestamp = Math.min(aEstimate.timestamp, bEstimate.timestamp);
 
-        const confidence = new BigNumber(1).minus(BigNumber.max(aEstimate.bidConfidence, aEstimate.askConfidence, bEstimate.bidConfidence, bEstimate.askConfidence));
+        const confidence = BigNumber.max(aEstimate.bidConfidence, aEstimate.askConfidence, bEstimate.bidConfidence, bEstimate.askConfidence);
 
         let roundedConfidence: number | null = null;
 

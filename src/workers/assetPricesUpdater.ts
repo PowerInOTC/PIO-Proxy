@@ -2,62 +2,31 @@ import Fmp from '../utils/fmpUtils';
 import Alpaca from '../utils/alpacaUtils';
 import { parentPort } from 'worker_threads';
 import { WorkerMessage } from '../types/worker';
-import { updateAssetPrices, getAssetPrice } from '../services/assetPriceService';
-import { getPairPrice } from '../utils/priceUtils';
-import { getSymbols, updateAssets } from '../services/assetsService';
+import { Prices, RetrievedPrices } from '../types/price';
+import { getPairPrice, updateAssetPrices } from '../utils/priceUtils';
 import { Assets } from '../types/assets';
+import { checkAsset, updateAssets } from '../services/assetsService';
 
 let symbols: { [key: string]: string[] } = {};
 let timeouts: NodeJS.Timeout[] = [];
 
-async function fetchData(provider: string, type: string) {
-    try {
-        let data = null;
-        if (provider == "fmp" && (type == "stock.nasdaq" || type == "forex")) {
-            data = await Fmp.getLatestPrices(type, symbols[type]);
-        }
-        else if (provider == "alpaca" && type == "stock.nasdaq") {
-            data = await Alpaca.getLatestPrices(type, symbols[type]);
-        }
-        if (data) {
-            updateAssetPrices(data);
-        }
-    } catch (error) {
-        parentPort?.postMessage({ type: 'error', payload: error });
-    }
-}
-
 parentPort?.on('message', async (message: WorkerMessage) => {
-    if (message.type === 'start') {
-        fetchData("fmp", "stock.nasdaq");
-        fetchData("fmp", "forex");
-        fetchData("alpaca", "stock.nasdaq");
+    if (message.type === 'setassets') {
+        let stockSymbols: Assets | null = null;
+        let forexSymbols: Assets | null = null;
+        let retryCount = 0;
 
-        timeouts.push(setInterval(() => {
-            fetchData("fmp", "stock.nasdaq");
-        }, message.payload.interval));
-        timeouts.push(setInterval(() => {
-            fetchData("fmp", "forex");
-        }, message.payload.interval));
-        timeouts.push(setInterval(() => {
-            fetchData("alpaca", "stock.nasdaq");
-        }, message.payload.interval));
-    }
-    else if (message.type === 'stop') {
-        for (let i = 0; i < timeouts.length; i++) {
-            const timeout = timeouts[i];
-            clearInterval(timeout);
-            timeouts.splice(i, 1);
+        while ((!stockSymbols || !forexSymbols) && retryCount < 3) {
+            [stockSymbols, forexSymbols] = await Promise.all([
+                Fmp.getStockSymbols(),
+                Fmp.getForexSymbols()
+            ]);
+            retryCount++;
         }
-    }
-    else if (message.type === 'setassets') {
-        const stockSymbols = await Fmp.getStockSymbols();
-        const forexSymbols = await Fmp.getForexSymbols();
 
         if (stockSymbols && forexSymbols) {
             const mergedSymbols: Assets = { ...stockSymbols, ...forexSymbols };
             updateAssets(mergedSymbols);
-            symbols = getSymbols();
 
             parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: true });
         }
@@ -67,21 +36,49 @@ parentPort?.on('message', async (message: WorkerMessage) => {
     }
     else if (message.type === 'getpairprice') {
         if (message.payload.a && message.payload.b) {
-            const a = getAssetPrice(message.payload.a);
-            if (!a) {
-                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
+            [message.payload.a, message.payload.b].forEach(item => {
+                const parts = item.split('.');
+                const assetName = parts.pop();
+                const assetType = parts.join('.');
+                if (assetName && assetType) {
+                    if (!checkAsset(assetType, assetName)) {
+                        parentPort?.postMessage({ uuid: message.uuid, type: "resultError", payload: `${item} doesn't exists` });
+                        return;
+                    }
+                }
+            });
+
+            let assetPrices: Prices = {};
+
+            let fmpRes: RetrievedPrices | null = null;
+            let alpacaRes: RetrievedPrices | null = null;
+            let retryCount = 0;
+
+            while ((!fmpRes || !alpacaRes) && retryCount < 3) {
+                [fmpRes, alpacaRes] = await Promise.all([
+                    Fmp.getLatestPrices([message.payload.a, message.payload.b]),
+                    Alpaca.getLatestPrices([message.payload.a, message.payload.b])
+                ]);
+                retryCount++;
+            }
+
+            if (!fmpRes || !alpacaRes) {
+                parentPort?.postMessage({ uuid: message.uuid, type: "resultError", payload: "Unable to fetch prices" });
                 return;
             }
-            const b = getAssetPrice(message.payload.b);
-            if (!b) {
-                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
-                return;
-            }
+
+            assetPrices = updateAssetPrices(assetPrices, fmpRes);
+            assetPrices = updateAssetPrices(assetPrices, alpacaRes);
+
+            const a = assetPrices[message.payload.a];
+            const b = assetPrices[message.payload.b];
+
             const pairPrice = getPairPrice(a, b, message.payload.abPrecision, message.payload.confPrecision);
             if (!pairPrice) {
-                parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: null });
+                parentPort?.postMessage({ uuid: message.uuid, type: "resultError", payload: "Unable to get pair price" });
                 return;
             }
+
             parentPort?.postMessage({ uuid: message.uuid, type: message.type, payload: pairPrice });
         }
     }

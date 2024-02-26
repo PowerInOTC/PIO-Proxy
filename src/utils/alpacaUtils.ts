@@ -3,43 +3,53 @@ import { handleFunctionError } from './sharedUtils';
 import { config } from '../config';
 import { RetrievedPrices } from '../types/price';
 import { AlpacaPrice, AlpacaResponse } from '../types/alpaca';
-import { splitSymbols } from './priceUtils';
 
 class Alpaca {
-    public static async getLatestPrices(type: string, symbols: string[]): Promise<RetrievedPrices | null> {
+    public static async getLatestPrices(symbols: string[]): Promise<RetrievedPrices | null> {
         try {
-            const baseUrl = 'https://data.alpaca.markets/v2/stocks/quotes/latest';
-            //No limits of symbols for Alpaca
-            const symbolsChunks = splitSymbols(symbols, 10000);
-            const urls = symbolsChunks.map(chunk => `${baseUrl}?symbols=${chunk}`);
+            const types: { [key: string]: string } = {};
+            symbols.forEach(item => {
+                const parts = item.split('.');
+                const assetName = parts.pop();
+                const assetType = parts.join('.');
+                if (assetName && assetType) {
+                    types[assetName] = assetType;
+                }
+            });
 
-            const requestsConfig: AxiosRequestConfig[] = urls.map(url => ({
-                method: 'GET',
-                url: url,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'APCA-API-KEY-ID': config.alpacaKey,
-                    'APCA-API-SECRET-KEY': config.alpacaSecret,
-                },
-                timeout: 2000
-            }));
+            const filteredSymbols = Object.entries(types)
+                .filter(([_, assetType]) => assetType === "stock.nasdaq" || assetType === "stock.nyse" || assetType === "stock.amex")
+                .map(([assetName, _]) => assetName);
 
-            const responses = await axios.all(requestsConfig.map(config => axios(config)));
+            const symbolsString = filteredSymbols.join(',');
+
+            if (!symbolsString) {
+                return {};
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'APCA-API-KEY-ID': config.alpacaKey,
+                'APCA-API-SECRET-KEY': config.alpacaSecret,
+            };
+
+            let apiUrl = 'https://data.alpaca.markets/v2/stocks/quotes/latest';
+            apiUrl += `?symbols=${symbolsString}`;
+
+            const response: AxiosResponse<AlpacaResponse> = await axios.get(apiUrl, { headers: headers, timeout: 2000 });
 
             const prices: RetrievedPrices = {};
-            responses.forEach((response) => {
-                const data: AlpacaResponse = response.data;
 
-                Object.entries(data.quotes).forEach(([symbol, stock]: [string, AlpacaPrice]) => {
-                    if (stock.bp && stock.ap) {
-                        let timestamp = new Date(stock.t).getTime();
-                        if (timestamp < 1000000000000) {
-                            timestamp = timestamp * 1000;
-                        }
-                        prices[type + "." + symbol.toUpperCase()] = { symbol: symbol.toUpperCase(), type: type, bidPrice: stock.bp.toString(), askPrice: stock.ap.toString(), provider: "alpaca", timestamp: timestamp };
+            Object.entries(response.data.quotes).forEach(([symbol, stock]: [string, AlpacaPrice]) => {
+                if (stock.bp && stock.ap) {
+                    let timestamp = new Date(stock.t).getTime();
+                    if (timestamp < 1000000000000) {
+                        timestamp = Math.floor(timestamp * 1000)
                     }
-                });
+                    prices[types[symbol.toUpperCase()] + "." + symbol.toUpperCase()] = { symbol: symbol.toUpperCase(), type: types[symbol.toUpperCase()], bidPrice: stock.bp.toString(), askPrice: stock.ap.toString(), provider: "alpaca", timestamp: timestamp };
+                }
             });
+
 
             return prices;
         } catch (error) {

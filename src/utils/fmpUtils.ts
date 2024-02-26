@@ -1,41 +1,44 @@
-import axios, { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosResponse, AxiosError } from 'axios';
 import { handleFunctionError } from './sharedUtils';
 import { config } from '../config';
 import { FmpAssetSymbol, FmpForexSymbol, FmpPrice } from '../types/fmp';
 import { RetrievedPrices } from '../types/price';
 import { Assets } from '../types/assets';
-import { splitSymbols } from './priceUtils';
 
 class Fmp {
-    public static async getLatestPrices(type: string, symbols: string[]): Promise<RetrievedPrices | null> {
+    public static async getLatestPrices(symbols: string[]): Promise<RetrievedPrices | null> {
         try {
-            const baseUrl = 'https://financialmodelingprep.com/api/v3/stock/full/real-time-price/';
-            //1000 symbols max for Fmp
-            const symbolsChunks = splitSymbols(symbols, 1000);
-            const urls = symbolsChunks.map(chunk => `${baseUrl}${chunk}?apikey=${config.fmpKey}`);
+            const types: { [key: string]: string } = {};
+            symbols.forEach(item => {
+                const parts = item.split('.');
+                const assetName = parts.pop();
+                const assetType = parts.join('.');
+                if (assetName && assetType) {
+                    types[assetName] = assetType;
+                }
+            });
 
-            const requestsConfig: AxiosRequestConfig[] = urls.map(url => ({
-                method: 'GET',
-                url: url,
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 2000
-            }));
+            const symbolsString = symbols.map(symbol => symbol.split('.').pop() || '').join(',');
 
-            const responses = await axios.all(requestsConfig.map(config => axios(config)));
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            let apiUrl = 'https://financialmodelingprep.com/api/v3';
+            apiUrl += `/stock/full/real-time-price/${symbolsString}?apikey=${config.fmpKey}`;
+
+            const response: AxiosResponse<FmpPrice[]> = await axios.get(apiUrl, { headers: headers, timeout: 2000 });
 
             const prices: RetrievedPrices = {};
-            responses.forEach((response) => {
-                const data: FmpPrice[] = response.data;
 
-                data.forEach((stock: FmpPrice) => {
-                    if (stock.bidPrice && stock.askPrice) {
-                        let timestamp: number = stock.lastUpdated;
-                        if (timestamp < 1000000000000) {
-                            timestamp = timestamp * 1000;
-                        }
-                        prices[type + "." + stock.symbol.toUpperCase()] = { symbol: stock.symbol.toUpperCase(), type: type, bidPrice: stock.bidPrice.toString(), askPrice: stock.askPrice.toString(), provider: "fmp", timestamp: timestamp };
+            response.data.forEach((stock: FmpPrice) => {
+                if (stock.bidPrice && stock.askPrice) {
+                    let timestamp: number = stock.lastUpdated;
+                    if (timestamp < 1000000000000) {
+                        timestamp = Math.floor(timestamp * 1000)
                     }
-                });
+                    prices[types[stock.symbol.toUpperCase()] + "." + stock.symbol.toUpperCase()] = { symbol: stock.symbol.toUpperCase(), type: types[stock.symbol.toUpperCase()], bidPrice: stock.bidPrice.toString(), askPrice: stock.askPrice.toString(), provider: "fmp", timestamp: timestamp };
+                }
             });
 
             return prices;

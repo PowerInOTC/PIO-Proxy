@@ -78,12 +78,12 @@ export const priceController = {
             const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
             const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum } });
 
-            if (data && data.payload) {
+            if (data && data.type != "resultError" && data.payload) {
                 res.json(data.payload);
                 return;
             }
             else {
-                handleRouteError(res, 404, 'access', 'getPairPrice', 'Data not found for the given tickers');
+                handleRouteError(res, 404, 'access', 'getPairPrice', data.payload);
                 return;
             }
         }

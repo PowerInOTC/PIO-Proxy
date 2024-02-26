@@ -10,8 +10,14 @@ export function getAssets(): Assets {
     return assets;
 }
 
+export function checkAsset(type: string, asset: string): boolean {
+    if (assets[type] && assets[type][asset]) {
+        return true;
+    }
+    return false;
+}
+
 export function getSymbols(assetType?: string): { [key: string]: string[] } {
-    //const assetSymbols: string[] = [];
     const assetSymbols: { [key: string]: string[] } = {};
     if (!assetType) {
         for (const assetTypeKey in assets) {
