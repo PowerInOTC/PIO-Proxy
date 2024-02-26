@@ -150,7 +150,7 @@ export function getPriceEstimate(price: Price, allowedTimestamp: number): {
     };
 }
 
-export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecision: number): PairPrice | null {
+export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecision: number, maxTimestampDiff: number): PairPrice | null {
     try {
         const lastTimestamp = getLatestTimestampFromPrices([a, b]);
 
@@ -158,7 +158,7 @@ export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecis
             return null;
         }
 
-        const allowedTimestamp = lastTimestamp - config.maxTimestampDiff;
+        const allowedTimestamp = lastTimestamp - maxTimestampDiff;
 
         const aEstimate = getPriceEstimate(a, allowedTimestamp);
         if (!aEstimate) {

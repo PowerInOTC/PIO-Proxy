@@ -6,7 +6,9 @@ export const config = {
     sslCertCertificatePath: process.env.SSL_CERT_CERTIFICATE_PATH || './fullchain.pem',
     serverAddress: process.env.SERVER_ADDRESS || '127.0.0.1',
     serverPort: process.env.SERVER_PORT || '3000',
-    maxTimestampDiff: parseInt(process.env.MAX_TIMESTAMP_DIFF || '2000'),
+    defaultAbPrecision: parseInt(process.env.DEFAULT_AB_PRECISION || '0'),
+    defaultConfPrecision: parseInt(process.env.DEFAULT_CONF_PRECISION || '0'),
+    defaultMaxTimestampDiff: parseInt(process.env.DEFAULT_MAX_TIMESTAMP_DIFF || '0'),
     fmpKey: process.env.FMP_KEY || '',
     alpacaKey: process.env.ALPACA_KEY || '',
     alpacaSecret: process.env.ALPACA_SECRET || ''

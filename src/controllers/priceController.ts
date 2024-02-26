@@ -2,13 +2,15 @@ import { Request, Response } from 'express';
 import { handleRouteError, handleFunctionError } from '../utils/sharedUtils';
 import WorkerController from '../utils/worker';
 import { formatTicker } from '../utils/priceUtils';
+import { config } from '../config';
 
 export const priceController = {
     getPairPrice: async (req: Request, res: Response): Promise<void> => {
         let a = req.query.a;
         let b = req.query.b;
-        let abPrecision = req.query.abprecision;
-        let confPrecision = req.query.confprecision;
+        const abPrecision = req.query.abprecision;
+        const confPrecision = req.query.confprecision;
+        const maxTimestampDiff = req.query.maxtimestampdiff
 
         if (!a || !b) {
             handleRouteError(res, 400, 'access', 'getPairPrice', 'You need to provide a & b parameters');
@@ -32,6 +34,7 @@ export const priceController = {
 
         let abPrecisionNum: number | null = null;
         let confPrecisionNum: number | null = null;
+        let maxTimestampDiffNum: number | null = null;
 
         if (abPrecision) {
             if (typeof abPrecision !== 'string') {
@@ -71,12 +74,31 @@ export const priceController = {
             }
         }
 
+        if (maxTimestampDiff) {
+            if (typeof maxTimestampDiff !== 'string') {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'maxTimestampDiff parameter needs to be a string');
+                return;
+            }
+
+            if (!/^[\d]+$/.test(maxTimestampDiff)) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'maxTimestampDiff parameter should only contain numbers');
+                return;
+            }
+
+            maxTimestampDiffNum = parseInt(maxTimestampDiff);
+
+            if (maxTimestampDiffNum < 0 || maxTimestampDiffNum > 604800) {
+                handleRouteError(res, 400, 'access', 'getPairPrice', 'maxTimestampDiff parameter should be between 0 and 604800');
+                return;
+            }
+        }
+
         try {
             a = formatTicker(a);
             b = formatTicker(b);
 
             const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
-            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum } });
+            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum || config.defaultAbPrecision, confPrecision: confPrecisionNum || config.defaultConfPrecision, maxTimestampDiff: maxTimestampDiffNum || config.defaultMaxTimestampDiff } });
 
             if (data && data.type != "resultError" && data.payload) {
                 res.json(data.payload);

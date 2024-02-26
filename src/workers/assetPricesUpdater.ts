@@ -73,7 +73,7 @@ parentPort?.on('message', async (message: WorkerMessage) => {
             const a = assetPrices[message.payload.a];
             const b = assetPrices[message.payload.b];
 
-            const pairPrice = getPairPrice(a, b, message.payload.abPrecision, message.payload.confPrecision);
+            const pairPrice = getPairPrice(a, b, message.payload.abPrecision, message.payload.confPrecision, message.payload.maxTimestampDiff);
             if (!pairPrice) {
                 parentPort?.postMessage({ uuid: message.uuid, type: "resultError", payload: "Unable to get pair price" });
                 return;
