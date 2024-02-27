@@ -48,11 +48,6 @@ export const priceController = {
             }
 
             abPrecisionNum = parseInt(abPrecision);
-
-            if (abPrecisionNum < 0 || abPrecisionNum > 20) {
-                handleRouteError(res, 400, 'access', 'getPairPrice', 'abPrecision parameter should be between 0 and 20');
-                return;
-            }
         }
 
         if (confPrecision) {
@@ -67,11 +62,6 @@ export const priceController = {
             }
 
             confPrecisionNum = parseInt(confPrecision);
-
-            if (confPrecisionNum < 0 || confPrecisionNum > 20) {
-                handleRouteError(res, 400, 'access', 'getPairPrice', 'confPrecision parameter should be between 0 and 20');
-                return;
-            }
         }
 
         if (maxTimestampDiff) {
@@ -86,11 +76,25 @@ export const priceController = {
             }
 
             maxTimestampDiffNum = parseInt(maxTimestampDiff);
+        }
 
-            if (maxTimestampDiffNum < 0 || maxTimestampDiffNum > 604800) {
-                handleRouteError(res, 400, 'access', 'getPairPrice', 'maxTimestampDiff parameter should be between 0 and 604800');
-                return;
-            }
+        abPrecisionNum = abPrecisionNum == null ? config.defaultAbPrecision : abPrecisionNum
+        confPrecisionNum = confPrecisionNum == null ? config.defaultConfPrecision : confPrecisionNum
+        maxTimestampDiffNum = maxTimestampDiffNum == null ? config.defaultMaxTimestampDiff : maxTimestampDiffNum
+
+        if (abPrecisionNum < 0 || abPrecisionNum > config.maxAbPrecision) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'abPrecision parameter should be between 0 and ' + config.maxAbPrecision);
+            return;
+        }
+
+        if (confPrecisionNum < 0 || confPrecisionNum > config.maxConfPrecision) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'confPrecision parameter should be between 0 and ' + config.maxConfPrecision);
+            return;
+        }
+
+        if (maxTimestampDiffNum < 0 || maxTimestampDiffNum > config.maxMaxTimestampDiff) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'maxTimestampDiff parameter should be between 0 and ' + config.maxMaxTimestampDiff);
+            return;
         }
 
         try {
@@ -98,7 +102,7 @@ export const priceController = {
             b = formatTicker(b);
 
             const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
-            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum || config.defaultAbPrecision, confPrecision: confPrecisionNum || config.defaultConfPrecision, maxTimestampDiff: maxTimestampDiffNum || config.defaultMaxTimestampDiff } });
+            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum, maxTimestampDiff: maxTimestampDiffNum } });
 
             if (data && data.type != "resultError" && data.payload) {
                 res.json(data.payload);

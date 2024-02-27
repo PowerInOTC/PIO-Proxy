@@ -9,6 +9,9 @@ export const config = {
     defaultAbPrecision: parseInt(process.env.DEFAULT_AB_PRECISION || '0'),
     defaultConfPrecision: parseInt(process.env.DEFAULT_CONF_PRECISION || '0'),
     defaultMaxTimestampDiff: parseInt(process.env.DEFAULT_MAX_TIMESTAMP_DIFF || '0'),
+    maxAbPrecision: parseInt(process.env.MAX_AB_PRECISION || '20'),
+    maxConfPrecision: parseInt(process.env.MAX_CONF_PRECISION || '20'),
+    maxMaxTimestampDiff: parseInt(process.env.MAX_MAX_TIMESTAMP_DIFF || '604800000'),
     fmpKey: process.env.FMP_KEY || '',
     alpacaKey: process.env.ALPACA_KEY || '',
     alpacaSecret: process.env.ALPACA_SECRET || ''

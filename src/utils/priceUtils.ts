@@ -172,7 +172,7 @@ export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecis
 
         let pairBid: string | null = null;
         let pairAsk: string | null = null;
-        if (abPrecision) {
+        if (abPrecision || abPrecision == 0) {
             pairBid = aEstimate.bidPriceEstimate.dividedBy(bEstimate.bidPriceEstimate).decimalPlaces(abPrecision, BigNumber.ROUND_HALF_UP).toString();
             pairAsk = aEstimate.askPriceEstimate.dividedBy(bEstimate.askPriceEstimate).decimalPlaces(abPrecision, BigNumber.ROUND_HALF_UP).toString();
         }
@@ -187,7 +187,7 @@ export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecis
 
         let roundedConfidence: number | null = null;
 
-        if (confPrecision) {
+        if (confPrecision || confPrecision == 0) {
             roundedConfidence = confidence.decimalPlaces(confPrecision, BigNumber.ROUND_DOWN).toNumber();
         }
         else {
