@@ -1,13 +1,14 @@
 import { Request, Response } from 'express';
 import { handleRouteError, handleFunctionError } from '../utils/sharedUtils';
 import WorkerController from '../utils/worker';
-import { formatTicker } from '../utils/priceUtils';
+import { formatAsset } from '../utils/priceUtils';
 import { config } from '../config';
+import { AssetVariable } from '../types/assets';
 
 export const priceController = {
     getPairPrice: async (req: Request, res: Response): Promise<void> => {
-        let a = req.query.a;
-        let b = req.query.b;
+        const a = req.query.a;
+        const b = req.query.b;
         const abPrecision = req.query.abprecision;
         const confPrecision = req.query.confprecision;
         const maxTimestampDiff = req.query.maxtimestampdiff
@@ -27,8 +28,8 @@ export const priceController = {
             return;
         }
 
-        if (!/^[a-zA-Z0-9\.]+$/.test(a) || !/^[a-zA-Z0-9\.]+$/.test(b)) {
-            handleRouteError(res, 400, 'access', 'getPairPrice', 'a & b parameters should only contain letters & numbers + dot symbol');
+        if (!/^[a-zA-Z0-9\.\-]+$/.test(a) || !/^[a-zA-Z0-9\.\-]+$/.test(b)) {
+            handleRouteError(res, 400, 'access', 'getPairPrice', 'a & b parameters should only contain letters & numbers + dot and hyphen symbols');
             return;
         }
 
@@ -98,11 +99,8 @@ export const priceController = {
         }
 
         try {
-            a = formatTicker(a);
-            b = formatTicker(b);
-
             const workerController = WorkerController.getInstance('./dist/workers/assetPricesUpdater.js');
-            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { a: a, b: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum, maxTimestampDiff: maxTimestampDiffNum } });
+            const data = await workerController.sendMessageToWorker({ type: 'getpairprice', payload: { assetA: a, assetB: b, abPrecision: abPrecisionNum, confPrecision: confPrecisionNum, maxTimestampDiff: maxTimestampDiffNum } });
 
             if (data && data.type != "resultError" && data.payload) {
                 res.json(data.payload);

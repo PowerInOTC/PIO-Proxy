@@ -3,22 +3,25 @@ import { handleFunctionError } from './sharedUtils';
 import { config } from '../config';
 import { FmpAssetSymbol, FmpForexSymbol, FmpPrice } from '../types/fmp';
 import { RetrievedPrices } from '../types/price';
-import { Assets } from '../types/assets';
+import { AssetVariable, Assets } from '../types/assets';
+import { isAllowedMarket } from './priceUtils';
 
 class Fmp {
-    public static async getLatestPrices(symbols: string[]): Promise<RetrievedPrices | null> {
+    public static async getLatestPrices(symbols: AssetVariable[]): Promise<RetrievedPrices | null> {
+        const markets = ["forex", "stock.nasdaq", "stock.nyse", "stock.amex"];
         try {
             const types: { [key: string]: string } = {};
             symbols.forEach(item => {
-                const parts = item.split('.');
-                const assetName = parts.pop();
-                const assetType = parts.join('.');
-                if (assetName && assetType) {
-                    types[assetName] = assetType;
+                if (item.prefix && item.assetName) {
+                    types[item.assetName] = item.prefix;
                 }
             });
 
-            const symbolsString = symbols.map(symbol => symbol.split('.').pop() || '').join(',');
+            const filteredSymbols = Object.entries(types)
+                .filter(([_, assetType]) => markets.includes(assetType))
+                .map(([assetName, _]) => assetName);
+
+            const symbolsString = filteredSymbols.join(',');
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -67,7 +70,7 @@ class Fmp {
             const assets: Assets = {};
             response.data.forEach((asset: FmpAssetSymbol) => {
                 if (asset.symbol && asset.name && asset.exchangeShortName && asset.type) {
-                    if (asset.exchangeShortName.toLowerCase() == "nyse" || asset.exchangeShortName.toLowerCase() == "nasdaq" || asset.exchangeShortName.toLowerCase() == "amex" || asset.exchangeShortName.toLowerCase() == "euronext") {
+                    if (isAllowedMarket(`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`)) {
                         if (!assets[`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`]) {
                             assets[`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`] = {};
                         }

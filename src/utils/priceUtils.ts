@@ -1,8 +1,10 @@
 import BigNumber from "bignumber.js";
-import { config } from '../config';
 import { PairPrice, Price, Prices, RetrievedPrices } from "../types/price";
 import { handleFunctionError } from "./sharedUtils";
 import Logger from '../utils/logger';
+import { AssetVariable } from "../types/assets";
+
+const markets = ["forex", "stock.nasdaq", "stock.nyse", "stock.amex"];
 
 export function updateAssetPrices(assetPrices: Prices, newPrices: RetrievedPrices): Prices {
     for (const [assetName, priceInfo] of Object.entries(newPrices)) {
@@ -39,17 +41,20 @@ export function formatNumberWithDecimals(inputNumber: string, decimalAmount: num
     return formattedNumber;
 }
 
-export function formatTicker(input: string): string {
-    const parts = input.split('.');
-    const lastPartIndex = parts.length - 1;
+export function isAllowedMarket(input: string): boolean {
+    return markets.includes(input.toLowerCase());
+}
 
-    parts[lastPartIndex] = parts[lastPartIndex].toUpperCase();
-
-    for (let i = 0; i < lastPartIndex; i++) {
-        parts[i] = parts[i].toLowerCase();
+export function formatAsset(input: string): AssetVariable | null {
+    for (const market of markets) {
+        if (input.startsWith(`${market}.`)) {
+            const marketLength = market.length;
+            const prefix = input.substring(0, input.indexOf('.', marketLength)).toLowerCase();
+            const assetName = input.substring(prefix.length + 1).toUpperCase();
+            return { prefix, assetName };
+        }
     }
-
-    return parts.join('.');
+    return null;
 }
 
 export function removePercentage(num: BigNumber, percentage: number): BigNumber {
@@ -152,6 +157,10 @@ export function getPriceEstimate(price: Price, allowedTimestamp: number): {
 
 export function getPairPrice(a: Price, b: Price, abPrecision: number, confPrecision: number, maxTimestampDiff: number): PairPrice | null {
     try {
+        if (!a || !b) {
+            return null;
+        }
+
         const lastTimestamp = getLatestTimestampFromPrices([a, b]);
 
         if (!lastTimestamp) {

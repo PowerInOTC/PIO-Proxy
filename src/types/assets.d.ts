@@ -13,4 +13,9 @@ type Asset = {
     type: string;
 }
 
-export { Assets, AssetType, Asset };
+type AssetVariable = {
+    prefix: string;
+    assetName: string;
+}
+
+export { Assets, AssetType, Asset, AssetVariable };

@@ -1,24 +1,29 @@
-import axios, { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosResponse, AxiosError } from 'axios';
 import { handleFunctionError } from './sharedUtils';
 import { config } from '../config';
 import { RetrievedPrices } from '../types/price';
 import { AlpacaPrice, AlpacaResponse } from '../types/alpaca';
+import { AssetVariable } from '../types/assets';
 
 class Alpaca {
-    public static async getLatestPrices(symbols: string[]): Promise<RetrievedPrices | null> {
+    public static async getLatestPrices(symbols: AssetVariable[]): Promise<RetrievedPrices | null> {
+        const markets = ["stock.nasdaq", "stock.nyse", "stock.amex"];
         try {
             const types: { [key: string]: string } = {};
-            symbols.forEach(item => {
-                const parts = item.split('.');
-                const assetName = parts.pop();
-                const assetType = parts.join('.');
-                if (assetName && assetType) {
-                    types[assetName] = assetType;
+            symbols.forEach((item, index) => {
+                //alpaca doesn't support symbols in tickers
+                if (item.prefix && item.assetName) {
+                    if (!/^[a-zA-Z0-9]+$/.test(item.assetName)) {
+                        symbols.splice(index, 1);
+                    }
+                    else {
+                        types[item.assetName] = item.prefix;
+                    }
                 }
             });
 
             const filteredSymbols = Object.entries(types)
-                .filter(([_, assetType]) => assetType === "stock.nasdaq" || assetType === "stock.nyse" || assetType === "stock.amex")
+                .filter(([_, assetType]) => markets.includes(assetType))
                 .map(([assetName, _]) => assetName);
 
             const symbolsString = filteredSymbols.join(',');

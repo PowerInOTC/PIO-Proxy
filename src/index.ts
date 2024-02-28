@@ -70,9 +70,9 @@ async function init(): Promise<void> {
         // Middleware
         app.use(express.json());
 
-        app.get('/api/v1/get_prices', limiter(1 * 60 * 1000, 120));
+        app.get('/api/v1/get_pair_price', limiter(config.windowTime, config.maxRequests));
 
-        app.get('/api/v1/get_prices', checkAuthorization);
+        app.get('/api/v1/get_pair_price', checkAuthorization);
 
         // Routes
         app.get('/api/v1/get_pair_price', priceController.getPairPrice);
