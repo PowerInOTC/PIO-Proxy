@@ -8,7 +8,7 @@ import { isAllowedMarket } from './priceUtils';
 
 class Fmp {
     public static async getLatestPrices(symbols: AssetVariable[]): Promise<RetrievedPrices | null> {
-        const markets = ["forex", "stock.nasdaq", "stock.nyse", "stock.amex"];
+        const markets = ["forex", "stock.nasdaq", "stock.nyse", "stock.amex", "stock.lse", "stock.bme", "stock.xetra", "stock.euronext"];
         try {
             const types: { [key: string]: string } = {};
             symbols.forEach(item => {
