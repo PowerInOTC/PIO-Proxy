@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const checkAuthorizationQuerySchema = z.object({
+  key: z.string().min(1).max(512),
+});
+
 export const getPairPriceQuerySchema = z.object({
   a: z
     .string()

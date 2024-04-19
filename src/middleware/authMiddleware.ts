@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
-import { handleFunctionError } from '../utils/sharedUtils';
+import { handleFunctionError, handleRouteError } from '../utils/sharedUtils';
+import { checkAuthorizationQuerySchema } from '../zod';
 
 const apiKeys: string[] = loadApiKeys('./config/keys.json');
 
@@ -21,14 +22,24 @@ export function loadApiKeys(filePath: string): string[] {
   }
 }
 
-export function checkAuthorization(
+export async function checkAuthorization(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
-): void {
-  const apiKey = req.query.key as string;
-
-  if (!apiKeys.includes(apiKey)) {
+): Promise<void> {
+  const validatedQuery =
+    await checkAuthorizationQuerySchema.safeParseAsync(req.query);
+  if (!validatedQuery.success) {
+    handleRouteError(
+      res,
+      400,
+      'access',
+      'checkAuthorization',
+      JSON.stringify(validatedQuery.error.issues),
+    );
+    return;
+  }
+  if (!apiKeys.includes(validatedQuery.data.key)) {
     res.status(401).json({ message: 'Invalid API key' });
   } else {
     next();
