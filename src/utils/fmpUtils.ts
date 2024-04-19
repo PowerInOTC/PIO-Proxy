@@ -7,124 +7,203 @@ import { AssetVariable, Assets } from '../types/assets';
 import { isAllowedMarket } from './priceUtils';
 
 class Fmp {
-    public static async getLatestPrices(symbols: AssetVariable[]): Promise<RetrievedPrices | null> {
-        const markets = ["forex", "stock.nasdaq", "stock.nyse", "stock.amex"];
-        try {
-            const types: { [key: string]: string } = {};
-            symbols.forEach(item => {
-                if (item.prefix && item.assetName) {
-                    types[item.assetName] = item.prefix;
-                }
-            });
-
-            const filteredSymbols = Object.entries(types)
-                .filter(([_, assetType]) => markets.includes(assetType))
-                .map(([assetName, _]) => assetName);
-
-            const symbolsString = filteredSymbols.join(',');
-
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-
-            let apiUrl = 'https://financialmodelingprep.com/api/v3';
-            apiUrl += `/stock/full/real-time-price/${symbolsString}?apikey=${config.fmpKey}`;
-
-            const response: AxiosResponse<FmpPrice[]> = await axios.get(apiUrl, { headers: headers, timeout: 2000 });
-
-            const prices: RetrievedPrices = {};
-
-            response.data.forEach((stock: FmpPrice) => {
-                if (stock.bidPrice && stock.askPrice) {
-                    let timestamp: number = stock.lastUpdated;
-                    if (timestamp < 1000000000000) {
-                        timestamp = Math.floor(timestamp * 1000)
-                    }
-                    prices[types[stock.symbol.toUpperCase()] + "." + stock.symbol.toUpperCase()] = { symbol: stock.symbol.toUpperCase(), type: types[stock.symbol.toUpperCase()], bidPrice: stock.bidPrice.toString(), askPrice: stock.askPrice.toString(), provider: "fmp", timestamp: timestamp };
-                }
-            });
-
-            return prices;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError;
-                handleFunctionError('app', 'getLatestPrices', `Response status: ${axiosError.response?.status} - Response data: ` + JSON.stringify(axiosError.response?.data));
-            }
-            else if (error instanceof Error) {
-                handleFunctionError('app', 'getLatestPrices', `Caught an error: ${error.message}`);
-            }
-
-            return null;
+  public static async getLatestPrices(
+    symbols: AssetVariable[],
+  ): Promise<RetrievedPrices | null> {
+    const markets = ['forex', 'stock.nasdaq', 'stock.nyse', 'stock.amex'];
+    try {
+      const types: { [key: string]: string } = {};
+      symbols.forEach((item) => {
+        if (item.prefix && item.assetName) {
+          types[item.assetName] = item.prefix;
         }
-    }
-    public static async getStockSymbols(): Promise<Assets | null> {
-        try {
-            const headers = {
-                'Content-Type': 'application/json',
-            };
+      });
 
-            let apiUrl = 'https://financialmodelingprep.com/api/v3';
-            apiUrl += `/available-traded/list?apikey=${config.fmpKey}`;
+      const filteredSymbols = Object.entries(types)
+        .filter(([_, assetType]) => markets.includes(assetType))
+        .map(([assetName, _]) => assetName);
 
-            const response: AxiosResponse<FmpAssetSymbol[]> = await axios.get(apiUrl, { headers: headers, timeout: 5000 });
-            const assets: Assets = {};
-            response.data.forEach((asset: FmpAssetSymbol) => {
-                if (asset.symbol && asset.name && asset.exchangeShortName && asset.type) {
-                    if (isAllowedMarket(`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`)) {
-                        if (!assets[`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`]) {
-                            assets[`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`] = {};
-                        }
-                        assets[`${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`][asset.symbol.toUpperCase()] = { symbol: asset.symbol.toUpperCase(), name: asset.name.toUpperCase(), exchangeShortName: asset.exchangeShortName.toLowerCase(), type: asset.type.toLowerCase() }
-                    }
-                }
-            });
+      const symbolsString = filteredSymbols.join(',');
 
-            return assets;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError;
-                handleFunctionError('app', 'getStockSymbols', `Response status: ${axiosError.response?.status} - Response data: ` + JSON.stringify(axiosError.response?.data));
-            }
-            else if (error instanceof Error) {
-                handleFunctionError('app', 'getStockSymbols', `Caught an error: ${error.message}`);
-            }
+      const headers = {
+        'Content-Type': 'application/json',
+      };
 
-            return null;
+      let apiUrl = 'https://financialmodelingprep.com/api/v3';
+      apiUrl += `/stock/full/real-time-price/${symbolsString}?apikey=${config.fmpKey}`;
+
+      const response: AxiosResponse<FmpPrice[]> = await axios.get(apiUrl, {
+        headers: headers,
+        timeout: 2000,
+      });
+
+      const prices: RetrievedPrices = {};
+
+      response.data.forEach((stock: FmpPrice) => {
+        if (stock.bidPrice && stock.askPrice) {
+          let timestamp: number = stock.lastUpdated;
+          if (timestamp < 1000000000000) {
+            timestamp = Math.floor(timestamp * 1000);
+          }
+          prices[
+            types[stock.symbol.toUpperCase()] + '.' + stock.symbol.toUpperCase()
+          ] = {
+            symbol: stock.symbol.toUpperCase(),
+            type: types[stock.symbol.toUpperCase()],
+            bidPrice: stock.bidPrice.toString(),
+            askPrice: stock.askPrice.toString(),
+            provider: 'fmp',
+            timestamp: timestamp,
+          };
         }
+      });
+
+      return prices;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        handleFunctionError(
+          'app',
+          'getLatestPrices',
+          `Response status: ${axiosError.response?.status} - Response data: ` +
+            JSON.stringify(axiosError.response?.data),
+        );
+      } else if (error instanceof Error) {
+        handleFunctionError(
+          'app',
+          'getLatestPrices',
+          `Caught an error: ${error.message}`,
+        );
+      }
+
+      return null;
     }
-    public static async getForexSymbols(): Promise<Assets | null> {
-        try {
-            const headers = {
-                'Content-Type': 'application/json',
+  }
+  public static async getStockSymbols(): Promise<Assets | null> {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      let apiUrl = 'https://financialmodelingprep.com/api/v3';
+      apiUrl += `/available-traded/list?apikey=${config.fmpKey}`;
+
+      const response: AxiosResponse<FmpAssetSymbol[]> = await axios.get(
+        apiUrl,
+        { headers: headers, timeout: 5000 },
+      );
+      const assets: Assets = {};
+      response.data.forEach((asset: FmpAssetSymbol) => {
+        if (
+          asset.symbol &&
+          asset.name &&
+          asset.exchangeShortName &&
+          asset.type
+        ) {
+          if (
+            isAllowedMarket(
+              `${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`,
+            )
+          ) {
+            if (
+              !assets[
+                `${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`
+              ]
+            ) {
+              assets[
+                `${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`
+              ] = {};
+            }
+            assets[
+              `${asset.type.toLowerCase()}.${asset.exchangeShortName.toLowerCase()}`
+            ][asset.symbol.toUpperCase()] = {
+              symbol: asset.symbol.toUpperCase(),
+              name: asset.name.toUpperCase(),
+              exchangeShortName: asset.exchangeShortName.toLowerCase(),
+              type: asset.type.toLowerCase(),
             };
-
-            let apiUrl = 'https://financialmodelingprep.com/api/v3';
-            apiUrl += `/symbol/available-forex-currency-pairs?apikey=${config.fmpKey}`;
-
-            const response: AxiosResponse<FmpForexSymbol[]> = await axios.get(apiUrl, { headers: headers, timeout: 5000 });
-            const assets: Assets = {};
-            response.data.forEach((asset: FmpForexSymbol) => {
-                if (asset.symbol && asset.name && asset.currency && asset.stockExchange && asset.exchangeShortName) {
-                    if (!assets[asset.exchangeShortName.toLowerCase()]) {
-                        assets[asset.exchangeShortName.toLowerCase()] = {};
-                    }
-                    assets[`${asset.exchangeShortName.toLowerCase()}`][asset.symbol.toUpperCase()] = { symbol: asset.symbol.toUpperCase(), name: asset.name, exchangeShortName: asset.exchangeShortName.toLowerCase(), type: asset.exchangeShortName.toLowerCase() }
-                }
-            });
-
-            return assets;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError;
-                handleFunctionError('app', 'getForexSymbols', `Response status: ${axiosError.response?.status} - Response data: ` + JSON.stringify(axiosError.response?.data));
-            }
-            else if (error instanceof Error) {
-                handleFunctionError('app', 'getForexSymbols', `Caught an error: ${error.message}`);
-            }
-
-            return null;
+          }
         }
+      });
+
+      return assets;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        handleFunctionError(
+          'app',
+          'getStockSymbols',
+          `Response status: ${axiosError.response?.status} - Response data: ` +
+            JSON.stringify(axiosError.response?.data),
+        );
+      } else if (error instanceof Error) {
+        handleFunctionError(
+          'app',
+          'getStockSymbols',
+          `Caught an error: ${error.message}`,
+        );
+      }
+
+      return null;
     }
+  }
+  public static async getForexSymbols(): Promise<Assets | null> {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      let apiUrl = 'https://financialmodelingprep.com/api/v3';
+      apiUrl += `/symbol/available-forex-currency-pairs?apikey=${config.fmpKey}`;
+
+      const response: AxiosResponse<FmpForexSymbol[]> = await axios.get(
+        apiUrl,
+        { headers: headers, timeout: 5000 },
+      );
+      const assets: Assets = {};
+      response.data.forEach((asset: FmpForexSymbol) => {
+        if (
+          asset.symbol &&
+          asset.name &&
+          asset.currency &&
+          asset.stockExchange &&
+          asset.exchangeShortName
+        ) {
+          if (!assets[asset.exchangeShortName.toLowerCase()]) {
+            assets[asset.exchangeShortName.toLowerCase()] = {};
+          }
+          assets[`${asset.exchangeShortName.toLowerCase()}`][
+            asset.symbol.toUpperCase()
+          ] = {
+            symbol: asset.symbol.toUpperCase(),
+            name: asset.name,
+            exchangeShortName: asset.exchangeShortName.toLowerCase(),
+            type: asset.exchangeShortName.toLowerCase(),
+          };
+        }
+      });
+
+      return assets;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        handleFunctionError(
+          'app',
+          'getForexSymbols',
+          `Response status: ${axiosError.response?.status} - Response data: ` +
+            JSON.stringify(axiosError.response?.data),
+        );
+      } else if (error instanceof Error) {
+        handleFunctionError(
+          'app',
+          'getForexSymbols',
+          `Caught an error: ${error.message}`,
+        );
+      }
+
+      return null;
+    }
+  }
 }
 
 export default Fmp;

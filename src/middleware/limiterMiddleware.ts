@@ -1,7 +1,10 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 
-export function limiter(windowMs: number, maxRequests: number): express.RequestHandler {
+export function limiter(
+  windowMs: number,
+  maxRequests: number,
+): express.RequestHandler {
   return rateLimit({
     windowMs: windowMs,
     max: maxRequests,

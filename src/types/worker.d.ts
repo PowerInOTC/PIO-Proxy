@@ -1,5 +1,5 @@
 export type WorkerMessage = {
-    uuid: string;
-    type: string;
-    payload?: any;
+  uuid: string;
+  type: string;
+  payload?: any;
 };

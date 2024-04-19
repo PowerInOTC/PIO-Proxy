@@ -102,7 +102,7 @@ To call the proxy and get the pair price, use the following example:
 
 ### Request
 ```http
-GET /api/v1/get_pair_price?a=stock.nasdaq.TSLA&b=forex.EURUSD&abprecision=10&confprecision=10&maxtimestampdiff=10
+GET /api/v1/get_pair_price?a=stock.nasdaq.TSLA&b=forex.EURUSD&abprecision=10&confprecision=10&maxtimestampdiff=10000
 ```
 
 - `key`: Your API key.
@@ -118,23 +118,12 @@ The response will contain the pair price along with the confidence level.
 
 ```json
 {
-  "pair_price": 123.45,
-  "confidence_level": 0.95
-}
-```
-
-## Example Response
-
-Upon querying the proxy server, the response will contain the following information:
-
-```json
-{
-	"assetA": "forex.EURUSD",
-	"assetB": "stock.nasdaq.AAPL",
-	"pairBid": "0.0059437091",
-	"pairAsk": "0.0059432752",
-	"confidence": "0.0000822165",
-	"timestamp": 1709065284764
+	"assetA": "stock.nasdaq.TSLA",
+	"assetB": "forex.EURUSD",
+	"pairBid": "187.8349336359",
+	"pairAsk": "187.8429853444",
+	"confidence": "0.0003682517",
+	"timestamp": 1709140679842
 }
 ```
 
