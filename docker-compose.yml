@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    container_name: pioproxy_container
+    restart: always
+    volumes:
+      - ./.env:/app/.env
+    ports:
+      - "${SERVER_ADDRESS}:${SERVER_PORT}:${SERVER_PORT}"
+    command: sh -c "pnpm start"

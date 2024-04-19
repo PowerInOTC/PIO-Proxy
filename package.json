@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "tsc && node dist/index.js",
+    "start": "npx tsc && node dist/index.js",
     "lint": "eslint \"./**/*.ts\" --fix && npx prettier --write \"./**/*.ts\""
   },
   "dependencies": {
