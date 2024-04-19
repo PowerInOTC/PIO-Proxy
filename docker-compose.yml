@@ -6,5 +6,5 @@ services:
     volumes:
       - ./.env:/app/.env
     ports:
-      - "${SERVER_ADDRESS}:${SERVER_PORT}:${SERVER_PORT}"
+      - "${SERVER_PORT}:${SERVER_PORT}"
     command: sh -c "pnpm start"
