@@ -27,8 +27,9 @@ export async function checkAuthorization(
   res: express.Response,
   next: express.NextFunction,
 ): Promise<void> {
-  const validatedQuery =
-    await checkAuthorizationQuerySchema.safeParseAsync(req.query);
+  const validatedQuery = await checkAuthorizationQuerySchema.safeParseAsync(
+    req.query,
+  );
   if (!validatedQuery.success) {
     handleRouteError(
       res,

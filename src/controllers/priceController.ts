@@ -35,45 +35,6 @@ export const priceController = {
         ? config.defaultMaxTimestampDiff
         : validatedQuery.data.maxTimestampDiff;
 
-    if (abPrecisionNum < 0 || abPrecisionNum > config.maxAbPrecision) {
-      handleRouteError(
-        res,
-        400,
-        'access',
-        'getPairPrice',
-        'abPrecision parameter should be between 0 and ' +
-          config.maxAbPrecision,
-      );
-      return;
-    }
-
-    if (confPrecisionNum < 0 || confPrecisionNum > config.maxConfPrecision) {
-      handleRouteError(
-        res,
-        400,
-        'access',
-        'getPairPrice',
-        'confPrecision parameter should be between 0 and ' +
-          config.maxConfPrecision,
-      );
-      return;
-    }
-
-    if (
-      maxTimestampDiffNum < 0 ||
-      maxTimestampDiffNum > config.maxMaxTimestampDiff
-    ) {
-      handleRouteError(
-        res,
-        400,
-        'access',
-        'getPairPrice',
-        'maxTimestampDiff parameter should be between 0 and ' +
-          config.maxMaxTimestampDiff,
-      );
-      return;
-    }
-
     try {
       const workerController = WorkerController.getInstance(
         'priceWorker',
