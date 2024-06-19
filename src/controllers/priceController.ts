@@ -43,6 +43,7 @@ export const priceController = {
       const data = await workerController.sendMessageToWorker({
         type: 'getpairprice',
         payload: {
+          uuid: validatedQuery.data.uuid,
           assetA: a,
           assetB: b,
           abPrecision: abPrecisionNum,

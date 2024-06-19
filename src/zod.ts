@@ -6,6 +6,7 @@ export const checkAuthorizationQuerySchema = z.object({
 });
 
 export const getPairPriceQuerySchema = z.object({
+  uuid: z.string().min(36).max(36).optional(),
   a: z
     .string()
     .min(1)
