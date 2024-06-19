@@ -3,7 +3,7 @@ import fs from 'fs';
 import { handleFunctionError, handleRouteError } from '../utils/sharedUtils';
 import { checkAuthorizationQuerySchema } from '../zod';
 
-const apiKeys: string[] = loadApiKeys('./config/keys.json');
+const apiKeys: string[] = loadApiKeys('./keys.json');
 
 export function loadApiKeys(filePath: string): string[] {
   try {

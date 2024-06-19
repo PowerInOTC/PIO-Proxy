@@ -51,4 +51,4 @@ yarn-error.log
 # Env files
 .env
 
-config/keys.json
+keys.json
